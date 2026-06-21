@@ -9,7 +9,6 @@ import {
   CloudFog,
 } from 'lucide-react';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
-import { useRealtimeData } from '@/hooks/useRealtimeData';
 import { useAppStore } from '@/store';
 import { cn } from '@/lib/utils';
 import SceneRoot from '@/components/3d/Scene';
@@ -49,7 +48,6 @@ function getWeatherIconColor(Icon: typeof Sun) {
 
 export default function DashboardPage() {
   useAuthGuard();
-  useRealtimeData(true);
 
   const forecast = useAppStore((s) => s.forecast);
   const forecastTimeIndex = useAppStore((s) => s.forecastTimeIndex);

@@ -94,12 +94,12 @@ const savedAlerts = storage.getAlerts();
 
 function dedupBriefings(list: WeatherBriefing[]): WeatherBriefing[] {
   const slotMs = 15 * 60 * 1000;
-  const seen = new Set<string>();
+  const seen = new Set<number>();
   const result: WeatherBriefing[] = [];
   for (const b of list) {
-    const key = `${Math.floor(b.generatedAt / slotMs)}_${b.period}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const slot = Math.floor(b.generatedAt / slotMs);
+    if (seen.has(slot)) continue;
+    seen.add(slot);
     result.push(b);
   }
   return result.slice(0, 200);
@@ -109,6 +109,9 @@ const savedBriefings = dedupBriefings(rawSavedBriefings);
 if (savedBriefings.length !== rawSavedBriefings.length) {
   storage.setBriefings(savedBriefings);
 }
+
+const validationThrottle: Record<string, number> = {};
+const VALIDATION_THROTTLE_MS = 30 * 1000;
 
 function enhanceAlert(alert: WeatherAlert, stations: WeatherStation[]) {
   const st = stations.find((s) => s.id === alert.stationId);
@@ -186,17 +189,22 @@ export const useAppStore = create<State & Actions>((set, get) => ({
 
     const validation = validateRealtimeAlertData(data, station);
     if (!validation.valid) {
-      if (station && Date.now() % 23 < 1) {
-        set({
-          alertValidationError: {
-            stationId,
-            stationName: station.name,
-            errors: validation.errors,
-            details: validation.details ?? [],
-            timestamp: Date.now(),
-          },
-        });
-        get().addLog('预警校验失败', station.name, Object.values(validation.errors).join('；'));
+      if (station) {
+        const now = Date.now();
+        const lastShown = validationThrottle[stationId] ?? 0;
+        if (now - lastShown >= VALIDATION_THROTTLE_MS) {
+          validationThrottle[stationId] = now;
+          set({
+            alertValidationError: {
+              stationId,
+              stationName: station.name,
+              errors: validation.errors,
+              details: validation.details ?? [],
+              timestamp: now,
+            },
+          });
+          get().addLog('预警校验失败', station.name, Object.values(validation.errors).join('；'));
+        }
       }
       return;
     }
@@ -295,14 +303,15 @@ export const useAppStore = create<State & Actions>((set, get) => ({
     const slotMs = 15 * 60 * 1000;
     const bSlot = Math.floor(b.generatedAt / slotMs);
     const existing = briefings.find(
-      (x) => Math.floor(x.generatedAt / slotMs) === bSlot && x.period === b.period,
+      (x) => Math.floor(x.generatedAt / slotMs) === bSlot,
     );
     if (existing) return;
-    const existingStorage = storage.getBriefings().find(
-      (x) => Math.floor(x.generatedAt / slotMs) === bSlot && x.period === b.period,
+    const storageList = storage.getBriefings();
+    const existingStorage = storageList.find(
+      (x) => Math.floor(x.generatedAt / slotMs) === bSlot,
     );
     if (existingStorage) {
-      set({ briefings: storage.getBriefings().slice(0, 200) });
+      set({ briefings: storageList.slice(0, 200) });
       return;
     }
     const next = [b, ...briefings];

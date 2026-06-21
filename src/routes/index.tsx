@@ -1,5 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router-dom';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
+import { useScheduler } from '@/hooks/useScheduler';
+import { useRealtimeData } from '@/hooks/useRealtimeData';
 import LoginPage from '@/pages/LoginPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import DashboardPage from '@/pages/DashboardPage';
@@ -10,13 +12,19 @@ import LogPage from '@/pages/LogPage';
 import ExportPage from '@/pages/ExportPage';
 import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
+import AlertToast from '@/components/common/AlertToast';
+import AlertValidationToast from '@/components/common/AlertValidationToast';
 
 function ProtectedLayout() {
   useAuthGuard();
+  useScheduler();
+  useRealtimeData(true);
   return (
     <div className="min-h-screen bg-space-900">
       <Sidebar />
       <TopBar />
+      <AlertToast />
+      <AlertValidationToast />
       <main className="ml-64 mt-14 min-h-[calc(100vh-3.5rem)]">
         <Outlet />
       </main>
