@@ -1,14 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useAppStore } from '@/store';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
+import { useInterval } from '@/hooks/useInterval';
 import GlassCard from '@/components/common/GlassCard';
 import BriefingCard from '@/components/briefing/BriefingCard';
 import { Cloud, CalendarDays, Timer, Inbox, RefreshCw } from 'lucide-react';
 import { REFRESH_INTERVALS } from '@/utils/constants';
-import { useInterval } from '@/hooks/useInterval';
 
 function formatDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function getCountdownToNextSlot(): number {
+  const now = Date.now();
+  const slotMs = REFRESH_INTERVALS.BRIEFING;
+  const nextSlot = Math.ceil(now / slotMs) * slotMs;
+  return Math.max(0, nextSlot - now);
 }
 
 export default function BriefingPage() {
@@ -18,17 +25,15 @@ export default function BriefingPage() {
   const today = useMemo(() => formatDate(new Date()), []);
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
-  const [countdown, setCountdown] = useState(REFRESH_INTERVALS.BRIEFING);
+  const [countdown, setCountdown] = useState(getCountdownToNextSlot());
 
   useInterval(() => {
-    setCountdown((prev) => {
-      if (prev <= 1000) {
-        generateBriefing();
-        return REFRESH_INTERVALS.BRIEFING;
-      }
-      return prev - 1000;
-    });
+    setCountdown(getCountdownToNextSlot());
   }, 1000);
+
+  useEffect(() => {
+    setCountdown(getCountdownToNextSlot());
+  }, []);
 
   const filteredBriefings = useMemo(() => {
     const start = new Date(startDate);
@@ -49,7 +54,6 @@ export default function BriefingPage() {
 
   const handleGenerateNow = () => {
     generateBriefing();
-    setCountdown(REFRESH_INTERVALS.BRIEFING);
   };
 
   if (loading) {

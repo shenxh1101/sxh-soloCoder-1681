@@ -88,9 +88,27 @@ for (const s of STATIONS_DATA) {
 
 const savedUser = storage.getUser();
 const savedLogs = storage.getLogs();
-const savedBriefings = storage.getBriefings();
+const rawSavedBriefings = storage.getBriefings();
 const savedWorkOrders = storage.getWorkOrders();
 const savedAlerts = storage.getAlerts();
+
+function dedupBriefings(list: WeatherBriefing[]): WeatherBriefing[] {
+  const slotMs = 15 * 60 * 1000;
+  const seen = new Set<string>();
+  const result: WeatherBriefing[] = [];
+  for (const b of list) {
+    const key = `${Math.floor(b.generatedAt / slotMs)}_${b.period}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(b);
+  }
+  return result.slice(0, 200);
+}
+
+const savedBriefings = dedupBriefings(rawSavedBriefings);
+if (savedBriefings.length !== rawSavedBriefings.length) {
+  storage.setBriefings(savedBriefings);
+}
 
 function enhanceAlert(alert: WeatherAlert, stations: WeatherStation[]) {
   const st = stations.find((s) => s.id === alert.stationId);
