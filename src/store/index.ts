@@ -74,6 +74,7 @@ export interface Actions {
   exportDailyReport: (date: string) => Blob;
   clearLatestAlert: () => void;
   clearAlertValidationError: () => void;
+  triggerValidationTest: () => void;
 }
 
 const initRealtime: Record<string, RealtimeWeather> = {};
@@ -273,6 +274,19 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   generateBriefing: () => {
     const { stations, realtimeData, activeAlerts, briefings } = get();
     const b = genBriefing(stations, realtimeData, activeAlerts);
+    const slotMs = 15 * 60 * 1000;
+    const bSlot = Math.floor(b.generatedAt / slotMs);
+    const existing = briefings.find(
+      (x) => Math.floor(x.generatedAt / slotMs) === bSlot && x.period === b.period,
+    );
+    if (existing) return;
+    const existingStorage = storage.getBriefings().find(
+      (x) => Math.floor(x.generatedAt / slotMs) === bSlot && x.period === b.period,
+    );
+    if (existingStorage) {
+      set({ briefings: storage.getBriefings().slice(0, 200) });
+      return;
+    }
     const next = [b, ...briefings];
     storage.appendBriefing(b);
     set({ briefings: next });
@@ -306,5 +320,32 @@ export const useAppStore = create<State & Actions>((set, get) => ({
 
   clearAlertValidationError: () => {
     set({ alertValidationError: null });
+  },
+
+  triggerValidationTest: () => {
+    const { stations } = get();
+    const station = stations[0];
+    const badData = {
+      temperature: NaN,
+      humidity: 999,
+      pressure: 'hello' as unknown as number,
+      windSpeed: -15,
+      windDirection: 999,
+      visibility: -500,
+      timestamp: Date.now(),
+    } as unknown as RealtimeWeather;
+    const validation = validateRealtimeAlertData(badData, station);
+    if (!validation.valid && station) {
+      set({
+        alertValidationError: {
+          stationId: station.id,
+          stationName: station.name,
+          errors: validation.errors,
+          details: validation.details ?? [],
+          timestamp: Date.now(),
+        },
+      });
+      get().addLog('预警校验失败(测试)', station.name, Object.values(validation.errors).join('；'));
+    }
   },
 }));

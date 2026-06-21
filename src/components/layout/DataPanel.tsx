@@ -68,6 +68,7 @@ export default function DataPanel() {
   const realtimeData = useAppStore((s) => s.realtimeData);
   const activeAlerts = useAppStore((s) => s.activeAlerts);
   const selectStation = useAppStore((s) => s.selectStation);
+  const triggerValidationTest = useAppStore((s) => s.triggerValidationTest);
 
   const allData = Object.values(realtimeData);
   const avgData = allData.length
@@ -187,7 +188,11 @@ export default function DataPanel() {
 
         <div className="pt-1">
           <div className="flex items-center justify-between mb-2.5">
-            <h3 className="text-[11px] font-orbitron text-white/60 tracking-wider">
+            <h3
+              className="text-[11px] font-orbitron text-white/60 tracking-wider select-none cursor-pointer transition-colors hover:text-white/80"
+              title="双击测试预警校验失败"
+              onDoubleClick={triggerValidationTest}
+            >
               最新预警
             </h3>
             <button

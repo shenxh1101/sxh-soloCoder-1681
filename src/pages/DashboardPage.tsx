@@ -14,7 +14,6 @@ import { useAppStore } from '@/store';
 import { cn } from '@/lib/utils';
 import SceneRoot from '@/components/3d/Scene';
 import DataPanel from '@/components/layout/DataPanel';
-import AlertToast from '@/components/common/AlertToast';
 import StationModal from '@/components/weather/StationModal';
 import { formatTemperature } from '@/utils/formatters';
 
@@ -66,7 +65,6 @@ export default function DashboardPage() {
       <div className="absolute bottom-0 right-1/4 w-96 h-96 rounded-full bg-radar-500/5 blur-3xl pointer-events-none" />
 
       <DataPanel />
-      <AlertToast />
       <StationModal />
 
       <motion.div

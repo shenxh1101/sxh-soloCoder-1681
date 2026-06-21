@@ -337,7 +337,12 @@ export function generateDailyReport(
 
   let alertDetails: DailyReport['alertDetails'] = [];
   if (isToday) {
-    alertDetails = _alerts.map((a) => {
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(); dayEnd.setHours(23, 59, 59, 999);
+    const filtered = _alerts.filter(
+      (a) => a.triggeredAt >= dayStart.getTime() && a.triggeredAt <= dayEnd.getTime(),
+    );
+    alertDetails = filtered.map((a) => {
       const s = stations.find((st) => st.id === a.stationId);
       const t = new Date(a.triggeredAt);
       return {
