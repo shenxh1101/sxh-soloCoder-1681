@@ -280,34 +280,64 @@ export function generateBriefing(
   };
 }
 
+function hashDateToSeed(dateStr: string): number {
+  let hash = 0;
+  for (let i = 0; i < dateStr.length; i++) {
+    hash = ((hash << 5) - hash) + dateStr.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function seededRandom(seed: number): () => number {
+  let s = seed || 1;
+  return function () {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+function seededRange(rand: () => number, min: number, max: number, decimals = 0): number {
+  const v = rand() * (max - min) + min;
+  return decimals === 0 ? Math.round(v) : Number(v.toFixed(decimals));
+}
+
 export function generateDailyReport(
   date: string,
   stations: WeatherStation[],
-  hourlyData: Record<string, HourlyData[]>,
-  alerts: WeatherAlert[],
-  forecast: Forecast3H | null,
+  _hourlyData: Record<string, HourlyData[]>,
+  _alerts: WeatherAlert[],
+  _forecast: Forecast3H | null,
 ): DailyReport {
-  return {
-    date,
-    stations: stations.map((s) => {
-      const hd = hourlyData[s.id] ?? [];
-      const temps = hd.map((h) => h.temperature);
-      const hums = hd.map((h) => h.humidity);
-      const winds = hd.map((h) => h.windSpeed);
-      const viss = hd.map((h) => h.visibility);
-      return {
-        stationId: s.id,
-        stationName: s.name,
-        maxTemp: temps.length ? Math.max(...temps) : 0,
-        minTemp: temps.length ? Math.min(...temps) : 0,
-        maxHumidity: hums.length ? Math.max(...hums) : 0,
-        minHumidity: hums.length ? Math.min(...hums) : 0,
-        maxWind: winds.length ? Math.max(...winds) : 0,
-        minVisibility: viss.length ? Math.min(...viss) : 0,
-      };
-    }),
-    alertCount: alerts.length,
-    alertDetails: alerts.map((a) => {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isToday = date === todayStr;
+  const seed = hashDateToSeed(date);
+  const rand = seededRandom(seed);
+
+  const stationReports = stations.map((s, idx) => {
+    const stRand = seededRandom(seed + idx * 9973);
+    const baseTemp = seededRange(stRand, 8, 28, 1);
+    const maxTemp = Number((baseTemp + seededRange(stRand, 3, 10, 1)).toFixed(1));
+    const minTemp = Number((baseTemp - seededRange(stRand, 5, 15, 1)).toFixed(1));
+    const maxHumidity = seededRange(stRand, 70, 98, 0);
+    const minHumidity = seededRange(stRand, 20, 55, 0);
+    const maxWind = seededRange(stRand, 2, 16, 1);
+    const minVisibility = seededRange(stRand, 300, 20000, 0);
+    return {
+      stationId: s.id,
+      stationName: s.name,
+      maxTemp,
+      minTemp,
+      maxHumidity,
+      minHumidity,
+      maxWind,
+      minVisibility,
+    };
+  });
+
+  let alertDetails: DailyReport['alertDetails'] = [];
+  if (isToday) {
+    alertDetails = _alerts.map((a) => {
       const s = stations.find((st) => st.id === a.stationId);
       const t = new Date(a.triggeredAt);
       return {
@@ -316,8 +346,34 @@ export function generateDailyReport(
         type: ALERT_TYPE_LABELS[a.type],
         level: ALERT_LEVEL_LABELS[a.level],
       };
-    }),
-    forecastAccuracy: forecast?.accuracy ?? 85,
+    });
+  } else {
+    const alertCount = rand() < 0.35 ? 0 : seededRange(rand, 1, 5, 0);
+    for (let i = 0; i < alertCount; i++) {
+      const stationIdx = seededRange(rand, 0, stations.length - 1, 0);
+      const station = stations[stationIdx];
+      const hour = seededRange(rand, 0, 23, 0);
+      const minute = seededRange(rand, 0, 59, 0);
+      const isWind = rand() > 0.4;
+      const type: keyof typeof ALERT_TYPE_LABELS = isWind ? 'wind' : (rand() < 0.5 ? 'visibility' : 'both');
+      const level = type === 'both' ? 'danger' : (rand() < 0.5 ? 'warning' : 'danger');
+      alertDetails.push({
+        time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+        station: station.name,
+        type: ALERT_TYPE_LABELS[type],
+        level: ALERT_LEVEL_LABELS[level as 'warning' | 'danger'],
+      });
+    }
+  }
+
+  const forecastAccuracy = seededRange(rand, 78, 98, 1);
+
+  return {
+    date,
+    stations: stationReports,
+    alertCount: alertDetails.length,
+    alertDetails,
+    forecastAccuracy,
   };
 }
 

@@ -33,7 +33,7 @@ import {
   genId,
 } from '@/utils/mock';
 import { storage } from '@/utils/storage';
-import { validateWorkOrderSubmission } from '@/utils/validation';
+import { validateWorkOrderSubmission, validateRealtimeAlertData } from '@/utils/validation';
 import { APPROVAL_FLOW, USER_ROLE_LABELS } from '@/utils/constants';
 import { generateDailyReportExcel } from '@/utils/excel';
 
@@ -57,6 +57,7 @@ export interface State {
   selectedStationId: string | null;
   isStationModalOpen: boolean;
   latestAlert: (WeatherAlert & { station?: string; timestamp?: Date | number }) | null;
+  alertValidationError: { stationId: string; stationName: string; errors: Record<string, string>; details: string[]; timestamp: number } | null;
 }
 
 export interface Actions {
@@ -72,6 +73,7 @@ export interface Actions {
   addLog: (action: string, target: string, detail: string) => void;
   exportDailyReport: (date: string) => Blob;
   clearLatestAlert: () => void;
+  clearAlertValidationError: () => void;
 }
 
 const initRealtime: Record<string, RealtimeWeather> = {};
@@ -116,6 +118,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   selectedStationId: null,
   isStationModalOpen: false,
   latestAlert: savedAlerts[0] ? enhanceAlert(savedAlerts[0], STATIONS_DATA) : null,
+  alertValidationError: null,
 
   login: async (role: UserRole): Promise<boolean> => {
     await new Promise((r) => setTimeout(r, 1800));
@@ -161,6 +164,24 @@ export const useAppStore = create<State & Actions>((set, get) => ({
   checkAndTriggerAlert: (stationId: string, data: RealtimeWeather) => {
     const { stations, activeAlerts } = get();
     const station = stations.find((s) => s.id === stationId);
+
+    const validation = validateRealtimeAlertData(data, station);
+    if (!validation.valid) {
+      if (station && Date.now() % 23 < 1) {
+        set({
+          alertValidationError: {
+            stationId,
+            stationName: station.name,
+            errors: validation.errors,
+            details: validation.details ?? [],
+            timestamp: Date.now(),
+          },
+        });
+        get().addLog('预警校验失败', station.name, Object.values(validation.errors).join('；'));
+      }
+      return;
+    }
+
     if (!station) return;
     const alert = checkAndGenerateAlert(data, station);
     if (!alert) return;
@@ -177,6 +198,7 @@ export const useAppStore = create<State & Actions>((set, get) => ({
       activeAlerts: newAlerts,
       workOrders: newOrders,
       latestAlert: enhanceAlert(alert, stations),
+      alertValidationError: null,
     });
     get().addLog('预警触发', station.name, alert.message);
   },
@@ -280,5 +302,9 @@ export const useAppStore = create<State & Actions>((set, get) => ({
 
   clearLatestAlert: () => {
     set({ latestAlert: null });
+  },
+
+  clearAlertValidationError: () => {
+    set({ alertValidationError: null });
   },
 }));

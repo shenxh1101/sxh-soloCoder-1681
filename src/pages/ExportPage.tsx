@@ -61,10 +61,12 @@ export default function ExportPage() {
   }, [effectiveDate, stations, hourlyData, activeAlerts, forecast]);
 
   const accuracyOption = useMemo(() => {
+    if (!report) return {} as any;
     const stations = STATIONS_DATA;
-    const data = stations.map((s) => ({
+    const dateSeed = report.date.split('-').reduce((a, b) => a + parseInt(b) * 37, 0);
+    const data = stations.map((s, idx) => ({
       name: s.name,
-      value: 85 + Math.floor(Math.random() * 11),
+      value: 78 + ((dateSeed + idx * 17) % 21),
     }));
     return {
       backgroundColor: 'transparent',
